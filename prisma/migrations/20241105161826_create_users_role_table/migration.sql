@@ -1,10 +1,11 @@
 -- CreateTable
 CREATE TABLE "users" (
-    "id" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "username" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
-    "role_id" TEXT NOT NULL,
+    "id" CHAR(36) NOT NULL,
+    "email" VARCHAR(255) NOT NULL,
+    "username" VARCHAR(255) NOT NULL,
+    "password" VARCHAR(255) NOT NULL,
+    "refresh_token" VARCHAR(255),
+    "role_id" CHAR(36),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -13,8 +14,8 @@ CREATE TABLE "users" (
 
 -- CreateTable
 CREATE TABLE "roles" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
+    "id" CHAR(36) NOT NULL,
+    "name" VARCHAR(200) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -23,16 +24,16 @@ CREATE TABLE "roles" (
 
 -- CreateTable
 CREATE TABLE "role_permissions" (
-    "role_id" TEXT NOT NULL,
-    "permission_id" TEXT NOT NULL,
+    "role_id" CHAR(36) NOT NULL,
+    "permission_id" CHAR(36) NOT NULL,
 
     CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("role_id","permission_id")
 );
 
 -- CreateTable
 CREATE TABLE "permissions" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
+    "id" CHAR(36) NOT NULL,
+    "name" VARCHAR(255) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -52,7 +53,7 @@ CREATE UNIQUE INDEX "roles_name_key" ON "roles"("name");
 CREATE UNIQUE INDEX "permissions_name_key" ON "permissions"("name");
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

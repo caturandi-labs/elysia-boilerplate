@@ -8,21 +8,22 @@ datasource db {
 }
 
 model User {
-  id        String   @id
-  email     String   @unique
-  username  String   @unique
-  password  String
-  role      Role?    @relation(fields: [roleId], references: [id])
-  roleId    String   @map("role_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @db.Char(36)
+  email         String   @unique @db.VarChar(255)
+  username      String   @unique @db.VarChar(255)
+  password      String   @db.VarChar(255)
+  refresh_token String?   @db.VarChar(255)
+  role          Role?    @relation(fields: [roleId], references: [id])
+  roleId        String?   @map("role_id") @db.Char(36)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Role {
-  id          String            @id
-  name        String            @unique
+  id          String            @id @db.Char(36)
+  name        String            @unique @db.VarChar(200)
   permissions RolePermissions[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -34,17 +35,17 @@ model Role {
 
 model RolePermissions {
   role         Role       @relation(fields: [roleId], references: [id])
-  roleId       String     @map("role_id")
+  roleId       String     @map("role_id") @db.Char(36)
   permission   Permission @relation(fields: [permissionId], references: [id])
-  permissionId String     @map("permission_id")
+  permissionId String     @map("permission_id") @db.Char(36)
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
 }
 
 model Permission {
-  id        String            @id
-  name      String            @unique
+  id        String            @id @db.Char(36)
+  name      String            @unique @db.VarChar(255)
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
   roles     RolePermissions[]
