@@ -8,13 +8,13 @@ datasource db {
 }
 
 model User {
-  id            String   @id @db.Char(36)
+  id            String   @id @db.Char(26)
   email         String   @unique @db.VarChar(255)
   username      String   @unique @db.VarChar(255)
   password      String   @db.VarChar(255)
-  refresh_token String?   @db.VarChar(255)
-  role          Role?    @relation(fields: [roleId], references: [id])
-  roleId        String?   @map("role_id") @db.Char(36)
+  refresh_token String?  @db.VarChar(255)
+  role          Role?    @relation(fields: [role_id], references: [id])
+  role_id       String?  @map("role_id") @db.Char(26)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -22,7 +22,7 @@ model User {
 }
 
 model Role {
-  id          String            @id @db.Char(36)
+  id          String            @id @db.Char(26)
   name        String            @unique @db.VarChar(200)
   permissions RolePermissions[]
 
@@ -35,16 +35,16 @@ model Role {
 
 model RolePermissions {
   role         Role       @relation(fields: [roleId], references: [id])
-  roleId       String     @map("role_id") @db.Char(36)
+  roleId       String     @map("role_id") @db.Char(26)
   permission   Permission @relation(fields: [permissionId], references: [id])
-  permissionId String     @map("permission_id") @db.Char(36)
+  permissionId String     @map("permission_id") @db.Char(26)
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
 }
 
 model Permission {
-  id        String            @id @db.Char(36)
+  id        String            @id @db.Char(26)
   name      String            @unique @db.VarChar(255)
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
