@@ -1,23 +1,16 @@
 import {Elysia} from "elysia";
 import {AuthModel} from "../models/user.model";
-import {jwt} from "@elysiajs/jwt";
 import {prisma} from "../database/prisma";
 import {ulid} from "ulidx";
 import {UserRepository} from "../repository/user.repository";
+import {authPlugin} from "../plugins/auth.plugin";
+import {AuthenticationException} from "../exceptions/authentication.exception";
 
 const AuthRoutes = new Elysia({
     prefix: '/auth',
 })
     .model(AuthModel)
-    .use(jwt({
-        name: 'jwt',
-        secret: Bun.env.JWT_SECRET!,
-        exp: '1d'
-    }))
-    .use(jwt({
-        name: 'jwtRefresh',
-        secret: Bun.env.JWT_SECRET!,
-    }))
+    .use(authPlugin)
     .post('/register', async ({body, set}) => {
         const userPassword = await Bun.password.hash(body.password, {
             algorithm: "bcrypt",
@@ -27,7 +20,7 @@ const AuthRoutes = new Elysia({
         const newUser = await prisma.user.create({
             data: {
                 ...body,
-                id: ulid().toString(),
+                id: ulid(),
                 password: userPassword
             }
         })
@@ -42,6 +35,7 @@ const AuthRoutes = new Elysia({
         }
     }, {
         body: 'auth.register',
+        isSignIn: false
     })
     .post('/login', async ({body, jwt, jwtRefresh, cookie: {accessTokenCookie, refreshTokenCookie}, set}) => {
 
@@ -49,7 +43,7 @@ const AuthRoutes = new Elysia({
 
         if (!user) {
             set.status = 400
-            throw new Error(
+            throw new AuthenticationException(
                 "Email is not yet registered in this system, Please check again"
             )
         }
@@ -62,29 +56,21 @@ const AuthRoutes = new Elysia({
 
         if (!passwordCheck) {
             set.status = "Bad Request"
-            throw new Error(
+            throw new AuthenticationException(
                 "Password doesn't match"
             )
         }
 
         const accessToken = await jwt.sign({
             sub: user.id,
-            maxAge: 86400,
         })
 
         const refreshToken = await jwtRefresh.sign({
             sub: user.id,
-            maxAge: 86400,
         })
 
-        await prisma.user.update({
-            where: {
-                id: user.id,
-            },
-            data: {
-                refresh_token: refreshToken
-            },
-        });
+
+        await UserRepository.updateRefreshToken(user.id, refreshToken)
 
 
         accessTokenCookie.set({
@@ -109,6 +95,13 @@ const AuthRoutes = new Elysia({
             }
         }
 
-    }, {body: 'auth.login'});
+    }, {body: 'auth.login', isSignIn: false})
+    .get('/me', async ({authenticatedUser}) => {
+        return {
+            ...authenticatedUser
+        }
+    }, {
+        isSignIn: true,
+    })
 
 export default AuthRoutes;
