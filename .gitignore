@@ -42,4 +42,4 @@ package-lock.json
 **/*.bun
 .env
 
-/src/logs/*
+/src/storage/logs/*
