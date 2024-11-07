@@ -8,6 +8,7 @@ const app = new Elysia()
     .error('AUTHENTICATION_ERROR', AuthenticationException)
     .error('AUTHORIZATION_ERROR', AuthorizationException)
     .onError(({error, code, set}) => {
+
         if ((code as unknown) == 'P2002') {
             set.status = 422
             return {
@@ -40,6 +41,12 @@ const app = new Elysia()
                 return {
                     status: "error",
                     message: "Something went wrong!"
+                }
+            case 'VALIDATION':
+                set.status = 400
+                return {
+                    status: "error",
+                    message: error.validator.Errors
                 }
         }
     })

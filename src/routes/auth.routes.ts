@@ -1,107 +1,87 @@
-import {Elysia} from "elysia";
-import {AuthModel} from "../models/user.model";
-import {prisma} from "../database/prisma";
-import {ulid} from "ulidx";
-import {UserRepository} from "../repository/user.repository";
-import {authPlugin} from "../plugins/auth.plugin";
-import {AuthenticationException} from "../exceptions/authentication.exception";
+import { Elysia } from "elysia";
+import { AuthModel } from "../models/user.model";
+import { authPlugin } from "../plugins/auth.plugin";
+import { AuthenticationException } from "../exceptions/authentication.exception";
+import { AuthServices } from "../services/auth.services";
 
 const AuthRoutes = new Elysia({
-    prefix: '/auth',
+  prefix: "/auth"
 })
-    .model(AuthModel)
-    .use(authPlugin)
-    .post('/register', async ({body, set}) => {
-        const userPassword = await Bun.password.hash(body.password, {
-            algorithm: "bcrypt",
-            cost: 10
-        });
+  .decorate("authService", new AuthServices)
+  .model(AuthModel)
+  .use(authPlugin)
+  .post("/register", async ({ body, set, authService }) => {
+    const newUser = await authService.registerUser(body);
+    set.status = 201;
 
-        const newUser = await prisma.user.create({
-            data: {
-                ...body,
-                id: ulid(),
-                password: userPassword
-            }
-        })
+    return {
+      message: "Account Successfully registered",
+      data: {
+        ...newUser
+      }
+    };
+  }, {
+    body: "auth.register",
+    isSignIn: false
+  })
+  .post("/login", async ({
+                           body,
+                           authService,
+                           jwt,
+                           jwtRefresh,
+                           cookie: { accessTokenCookie, refreshTokenCookie },
+                           set
+                         }) => {
 
-        set.status = 201
+    const user = await authService.validateUser(body.email, body.password);
 
-        return {
-            message: "Account Successfully created",
-            data: {
-                ...newUser
-            }
-        }
-    }, {
-        body: 'auth.register',
-        isSignIn: false
-    })
-    .post('/login', async ({body, jwt, jwtRefresh, cookie: {accessTokenCookie, refreshTokenCookie}, set}) => {
+    if (!user) {
+      set.status = 400;
+      throw new AuthenticationException(
+        "Your credentials is not valid"
+      );
+    }
 
-        const user = await UserRepository.findUser(body.email)
+    const accessToken = await jwt.sign({
+      sub: user.id
+    });
 
-        if (!user) {
-            set.status = 400
-            throw new AuthenticationException(
-                "Email is not yet registered in this system, Please check again"
-            )
-        }
+    const refreshToken = await jwtRefresh.sign({
+      sub: user.id
+    });
 
-        const passwordCheck = await Bun.password.verify(
-            body.password,
-            user.password,
-            "bcrypt"
-        )
+    await authService.updateUserToken(user.id, refreshToken);
 
-        if (!passwordCheck) {
-            set.status = "Bad Request"
-            throw new AuthenticationException(
-                "Password doesn't match"
-            )
-        }
-
-        const accessToken = await jwt.sign({
-            sub: user.id,
-        })
-
-        const refreshToken = await jwtRefresh.sign({
-            sub: user.id,
-        })
+    accessTokenCookie.set({
+      value: accessToken,
+      httpOnly: true,
+      path: "/"
+    });
 
 
-        await UserRepository.updateRefreshToken(user.id, refreshToken)
+    refreshTokenCookie.set({
+      value: refreshToken,
+      httpOnly: true,
+      path: "/"
+    });
 
+    set.status = 200;
 
-        accessTokenCookie.set({
-            value: accessToken,
-            httpOnly: true,
-            path: "/",
-        });
+    return {
+      data: {
+        access_token: accessToken,
+        refresh_token: refreshToken
+      }
+    };
 
-
-        refreshTokenCookie.set({
-            value: refreshToken,
-            httpOnly: true,
-            path: "/",
-        });
-
-        set.status = 200
-
-        return {
-            data: {
-                access_token: accessToken,
-                refresh_token: refreshToken
-            }
-        }
-
-    }, {body: 'auth.login', isSignIn: false})
-    .get('/me', async ({authenticatedUser}) => {
-        return {
-            ...authenticatedUser
-        }
-    }, {
-        isSignIn: true,
-    })
+  }, { body: "auth.login", isSignIn: false })
+  .get("/me", async ({ authenticatedUser }) => {
+    return {
+      ...authenticatedUser
+    };
+  }, {
+    isSignIn: true,
+    roles: ["admin"]
+  });
 
 export default AuthRoutes;

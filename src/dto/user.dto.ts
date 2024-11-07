@@ -26,5 +26,7 @@ export const loginDto = t.Object({
     }),
 })
 
+
+
 export type registerDtoBody = typeof registerDto.static
 export type loginDtoBody = typeof loginDto.static
