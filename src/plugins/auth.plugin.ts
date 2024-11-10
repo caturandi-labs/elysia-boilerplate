@@ -1,95 +1,85 @@
-import {Elysia} from 'elysia'
-import {jwtPlugin} from "./jwt.plugin";
-import {AuthorizationException} from "../exceptions/authorization.exception";
-import {UserRepository} from "../repository/user.repository";
-import {toUserResource} from "../models/user.model";
-import bearer from "@elysiajs/bearer";
+import { Elysia } from 'elysia'
+import { jwtPlugin } from './jwt.plugin'
+import { AuthorizationException } from '../exceptions/authorization.exception'
+import { UserRepository } from '../repository/user.repository'
+import { toUserResource } from '../models/user.model'
+import bearer from '@elysiajs/bearer'
 
-export const authPlugin = (app: Elysia) => app
+export const authPlugin = (app: Elysia) =>
+  app
     .use(jwtPlugin)
     .use(bearer())
-    .derive(async ({bearer, set, cookie: {accessTokenCookie}}) => {
-        if (!accessTokenCookie.value) return // no cookie meaning no checking bearer
-        if (!bearer || (bearer != accessTokenCookie.value)) { // bearer should be same as cookie access token
-            set.status = 401
-            set.headers[
-                'WWW-Authenticate'
-                ] = `Bearer realm='sign', error="invalid_request"`
-            throw new AuthorizationException('Unauthorized Access')
-        }
+    .derive(async ({ set, bearer, cookie: { refreshTokenCookie } }) => {
+      if (!refreshTokenCookie.value) {
+        return
+      }
+      if (!bearer) {
+        set.status = 401
+        set.headers['WWW-Authenticate'] = `Bearer realm='sign', error="invalid_request"`
+        throw new AuthorizationException('Unauthorized Access')
+      }
     })
-    .resolve(async ({cookie: {accessTokenCookie}, jwt, set}) => {
-        if (!accessTokenCookie.value) {
-            return
-        }
+    .resolve(async ({ bearer, jwt, set, path }) => {
+      if (!bearer || path.includes('refresh-token')) {
+        return
+      }
 
-        const decoded = await jwt.verify(accessTokenCookie.value)
+      const decoded = await jwt.verify(bearer)
+      console.log(decoded)
 
-        if (!decoded) {
-            set.status = 401
+      if (!decoded) {
+        set.status = 401
+        throw new AuthorizationException('Unauthorized')
+      }
+      const { sub } = decoded
 
-            throw new AuthorizationException("Unauthorized")
-        }
-        const {sub} = decoded
+      const user = await UserRepository.findUserWithDetails(sub!)
 
-        const user = await UserRepository.findUserWithDetails(sub!)
+      if (!user) {
+        set.status = 401
+        throw new AuthorizationException('Unauthorized, user not found')
+      }
 
-        if (!user) {
-            set.status = 401
-            throw new AuthorizationException("Unauthorized, user not found")
-        }
-
-        return {
-            authenticatedUser: toUserResource(user)
-        }
+      return {
+        authenticatedUser: toUserResource(user),
+      }
     })
-    .macro(({onBeforeHandle, onAfterHandle}) => {
-        return {
-            isSignIn(enabled: boolean) {
-                if (!enabled) return
+    .macro(({ onBeforeHandle, onAfterHandle }) => {
+      return {
+        isSignIn(enabled: boolean) {
+          if (!enabled) return
 
-                onBeforeHandle(
-                    async ({cookie: {accessTokenCookie}, set}) => {
-                        if (!enabled) {
-                            return;
-                        }
-                        if (!accessTokenCookie.value) {
-                            set.status = 401
-                            throw new AuthorizationException("Unauthorized")
-                        }
-
-                    }
-                )
-            },
-            roles(list?: string[]) {
-                onAfterHandle(
-                    async ({set, authenticatedUser}) => {
-                        if (list?.length === 0) return;
-
-                        if (authenticatedUser?.role) {
-                            if (!list?.includes(authenticatedUser.role)) {
-                                set.status = 403
-                                throw new AuthorizationException("Forbidden Access")
-                            }
-                        }
-                    }
-                )
-            },
-            permissions(list?: string[]) {
-                if (list?.length === 0) return
-
-                onAfterHandle(
-                    async ({set, authenticatedUser}) => {
-                        if (list?.length === 0) return;
-
-                        if (authenticatedUser?.permissions) {
-
-                        }
-                    }
-                )
-
+          onBeforeHandle(async ({ bearer, set }) => {
+            if (!enabled) {
+              return
             }
-        }
+            if (!bearer) {
+              set.status = 401
+              throw new AuthorizationException('Unauthorized')
+            }
+          })
+        },
+        roles(list?: string[]) {
+          onAfterHandle(async ({ set, authenticatedUser }) => {
+            if (list?.length === 0) return
+
+            if (authenticatedUser?.role) {
+              if (!list?.includes(authenticatedUser.role)) {
+                set.status = 403
+                throw new AuthorizationException('Forbidden Access')
+              }
+            }
+          })
+        },
+        permissions(list?: string[]) {
+          if (list?.length === 0) return
+
+          onAfterHandle(async ({ set, authenticatedUser }) => {
+            if (list?.length === 0) return
+
+            if (authenticatedUser?.permissions) {
+            }
+          })
+        },
+      }
     })
-
-
